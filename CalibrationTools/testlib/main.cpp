@@ -3,11 +3,15 @@
 #include "StereoCalibration.h"
 #include "RGBtofCalibration.h"
 #include "LinePointsTools.h"
+#include "Functions.h"
 
 #include <io.h> 
 #include <iostream>
 #include <fstream>
 #include <sstream>
+
+#include <pcl/filters/passthrough.h>
+
 
 //测试相机内参标定
 void testCameraIntrinsic1();
@@ -27,12 +31,20 @@ void calcamintrinsic();
 
 void rectifyPC2floor();
 
+//计算激光线角度
+void getLineAngleByPointCloud();
+
+//测试计算点云平面度
+void testPlaneFlatness();
+
 
 int main()
 {
+	//testPlaneFlatness();
+	//getLineAngleByPointCloud();
 	//calcamintrinsic();
 	//testRGBtofCalibration();
-	testStereoCalibaration1();
+	//testStereoCalibaration1();
 	testStereoRectify();
 	//testCameraIntrinsic1();
 
@@ -107,14 +119,14 @@ void testStereoCalibaration1()
 {
 	StereoCalibration stereoCalib;
 	CameraIntrinsic camLeft, camRight;
-	std::string intrinsicSaveNameLeft = "../../Data/StereoData/testStereoAlgorithmData/intinsicLeft.yml";
-	std::string intrinsicSaveNameRight = "../../Data/StereoData/testStereoAlgorithmData/intinsicRight.yml";
-	std::string intrinsicSaveNameStereo = "../../Data/StereoData/testStereoAlgorithmData/stereoModel.yml";
-	std::string cam1PicsFolder = "../../Data/StereoData/testStereoAlgorithmData/CalibrationData/";
+	std::string intrinsicSaveNameLeft = "D://codes//Reconstruction//Calibrations//Data//StereoData//testStereoAlgorithmData2//intinsicLeft.yml";
+	std::string intrinsicSaveNameRight = "D://codes//Reconstruction//Calibrations//Data//StereoData//testStereoAlgorithmData2//intinsicRight.yml";
+	std::string intrinsicSaveNameStereo = "D://codes//Reconstruction//Calibrations//Data//StereoData//testStereoAlgorithmData2//stereoModel.yml";
+	std::string calibrationPicsFolder = "D://codes//Reconstruction//Calibrations//Data//StereoData//testStereoAlgorithmData2//CalibrationPics//";
 	std::vector<std::string> filesNamesLeft;
 	std::vector<std::string> filesNamesRight;
 	std::vector<std::string> filesNamesAll;
-	getFiles(cam1PicsFolder, filesNamesAll);
+	getFiles(calibrationPicsFolder, filesNamesAll);
 	std::string leftHead = "Left";
 	std::string rightHead = "Right";
 	bool isCricle = false;
@@ -236,16 +248,13 @@ void testStereoRectify_realsense()
 //测试立体矫正
 void testStereoRectify()
 {
-	std::string intrinsicSaveNameLeft = "../../Data/StereoData/testStereoAlgorithmData/intinsicLeft.yml";
-	std::string intrinsicSaveNameRight = "../../Data/StereoData/testStereoAlgorithmData/intinsicRight.yml";
-	std::string intrinsicSaveNameStereo = "../../Data/StereoData/testStereoAlgorithmData/stereoModel.yml";
+	std::string intrinsicSaveNameLeft = "D://codes//Reconstruction//Calibrations//Data//StereoData//testStereoAlgorithmData2//intinsicLeft.yml";
+	std::string intrinsicSaveNameRight = "D://codes//Reconstruction//Calibrations//Data//StereoData//testStereoAlgorithmData2//intinsicRight.yml";
+	std::string intrinsicSaveNameStereo = "D://codes//Reconstruction//Calibrations//Data//StereoData//testStereoAlgorithmData2//stereoModel.yml";
+	std::string  testImageFolder = "D://codes//Reconstruction//Calibrations//Data//StereoData//testStereoAlgorithmData2//YLWlight//";
+	std::string  testImageUndistoredFolder = "D://codes//Reconstruction//Calibrations//Data//StereoData//testStereoAlgorithmData2//YLWlightUndistored//";
 
-	//std::string  testImageFolder = "../../Data/StereoData/testStereoAlgorithmData/testData";
-	//std::string  testImageUndistoredFolder = "../../Data/StereoData/testStereoAlgorithmData/testDataUndistored";
-	//std::string  testImageFolder = "../../Data/StereoData/testStereoAlgorithmData/testData2";
-	//std::string  testImageUndistoredFolder = "../../Data/StereoData/testStereoAlgorithmData/testData2Undistored";
-	std::string  testImageFolder = "../../Data/StereoData/testStereoAlgorithmData/testData3";
-	std::string  testImageUndistoredFolder = "../../Data/StereoData/testStereoAlgorithmData/testData3Undistored";
+	createFolder(testImageUndistoredFolder);
 
 	std::vector<std::string> files;
 	getFiles(testImageFolder, files);
@@ -492,5 +501,49 @@ void rectifyPC2floor()
 	tools.getBack2GroundT(-10, 10, 220, 300, 1, T);
 	std::cout << "T:" << std::endl;
 	std::cout << T << std::endl;
+
+}
+
+//测试通过点云计算激光线夹角
+void getLineAngleByPointCloud()
+{
+	std::string pointcloudname = "201.pcd";
+	pcl::PointCloud<pcl::PointXYZ> cloudall;
+	readPCDfile(pointcloudname, cloudall);
+
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloudallPtr(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::copyPointCloud(cloudall, *cloudallPtr);
+
+	
+	pcl::PassThrough<pcl::PointXYZ> passfilter;
+	passfilter.setInputCloud(cloudallPtr);
+	passfilter.setFilterFieldName("y");
+	passfilter.setFilterLimits(-80, 0);
+	passfilter.filter(*cloud_filtered);
+
+
+	float angle1;
+	getLineAngle(*cloud_filtered, 200, 10, FLT_MAX, -FLT_MAX, angle1);
+	std::cout << "夹角为：" << angle1;
+
+	passfilter.setFilterFieldName("y");
+	passfilter.setFilterLimits(100, FLT_MAX);
+	passfilter.filter(*cloud_filtered);
+	getLineAngle(*cloud_filtered, 200, 10, FLT_MAX, -FLT_MAX, angle1);
+	std::cout << "夹角为：" << angle1;
+
+}
+
+//测试平面点云平面度
+void testPlaneFlatness()
+{
+	std::string pointcloudname = "1.txt";
+	pcl::PointCloud<pcl::PointXYZ> cloud;
+	readTXTfile(pointcloudname, cloud);
+	float outlierPercent = 0.001;
+	float mazDistance;
+	float minDistance;
+	getPlaneFlatness(cloud, outlierPercent, mazDistance, minDistance);
 
 }

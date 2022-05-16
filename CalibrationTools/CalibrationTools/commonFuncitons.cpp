@@ -8,6 +8,60 @@
 #define M_PI 3.14159265358979323846
 #endif // !M_PI
 
+std::string currrentDataToString()
+{
+	time_t rawtime;
+	struct tm * timeinfo;
+	char buffer[80];
+
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+
+	//strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
+	strftime(buffer, sizeof(buffer), "%Y_%m%d_%H%M_%S", timeinfo);
+	std::string str(buffer);
+
+	return str;
+}
+
+void planeFitting(Eigen::Matrix<float, Eigen::Dynamic, 3> const & points, Eigen::Vector3f & center, Eigen::Vector3f & norm)
+{
+	// -----------------------------------------------------
+	// Plane Fitting using Singular Value Decomposition (SVD)
+	// -----------------------------------------------------
+
+	const auto n_points = points.rows();
+	if (n_points == 0)
+	{
+		return;
+	}
+
+	//find the center by averaging the points positions
+	center = points.colwise().mean().transpose();
+
+	//copy points - average (center)
+	const Eigen::Matrix<float, Eigen::Dynamic, 3> A = points.rowwise() - center.transpose();
+
+	Eigen::JacobiSVD<Eigen::MatrixXf> svd(A, Eigen::ComputeFullV);
+	norm = svd.matrixV().col(2);
+}
+
+void planeFitting(const pcl::PointCloud<pcl::PointXYZ>& cloud, Eigen::Vector3f & center, Eigen::Vector3f & norm)
+{
+	int numOfPoints = cloud.points.size();
+	Eigen::Matrix<float, Eigen::Dynamic, 3> points(numOfPoints, 3);
+	//points = cloud.getMatrixXfMap();
+	for (int i = 0; i < numOfPoints; i++)
+	{
+		Eigen::Vector3f currentPt = cloud.points[i].getVector3fMap();
+		//points << currentPt;
+		points(i, 0) = currentPt.x();
+		points(i, 1) = currentPt.y();
+		points(i, 2) = currentPt.z();
+	}
+	planeFitting(points, center, norm);
+}
+
 std::vector<std::string> split(std::string str, char del) {
 	std::stringstream ss(str);
 	std::string temp;
@@ -16,6 +70,26 @@ std::vector<std::string> split(std::string str, char del) {
 		ret.push_back(temp);
 	}
 	return ret;
+}
+
+bool readTXTfile(std::string filename, pcl::PointCloud<pcl::PointXYZ>& cloud)
+{
+	FILE *fp = fopen(filename.c_str(), "r");
+	if (fp == nullptr)
+		return false;
+	cloud.points.clear();
+	cloud.points.reserve(3000000);
+	while (!feof(fp))
+	{
+		float temp[3];
+		fscanf(fp, "%f %f %f\n", &temp[0], &temp[1], &temp[2]);
+		cloud.points.emplace_back(temp[0], temp[1], temp[2]);
+	}
+	cloud.points.shrink_to_fit();
+	cloud.width = 1;
+	cloud.height = cloud.points.size();
+	fclose(fp);
+	return true;
 }
 
 void readPCDfile(std::string filename, pcl::PointCloud<pcl::PointXYZ>& cloud)
@@ -83,6 +157,7 @@ void createFolder(std::string path)
 
 void getFiles(const std::string & path, std::vector<std::string> & files)
 {
+	files.clear();
 	//文件句柄  
 	long long hFile = 0;
 	//文件信息，_finddata_t需要io.h头文件  

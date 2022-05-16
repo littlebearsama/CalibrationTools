@@ -344,6 +344,7 @@ bool CameraIntrinsic::compute(bool isvisible)
 		double mean_err = 0.0;
 		double total_err = 0.0;
 		std::vector<cv::Point2f> reprojectionPoint;
+		std::vector<float> errors;
 		for (int i = 0; i < m_calibWorldPoint.size(); i++)
 		{
 			std::vector<cv::Point3f> tempPointSet = m_calibWorldPoint[i];
@@ -366,7 +367,7 @@ bool CameraIntrinsic::compute(bool isvisible)
 				tempImagePointMat.at<cv::Vec2f>(0, j) = cv::Vec2f(tempImagePoint[j].x, tempImagePoint[j].y);
 			}
 			err = norm(image_points2Mat, tempImagePointMat, cv::NORM_L2);
-
+			errors.push_back(err);//保存用于剔除误差过大的棋盘格图
 			mean_err = err / (m_patternSize.width*m_patternSize.height);
 			total_err += mean_err;
 		}
@@ -376,12 +377,27 @@ bool CameraIntrinsic::compute(bool isvisible)
 			calibrationSucessFlag = true;
 		else
 		{
-			//筛选根据棋盘格角度剔除角点点集（在棋盘格角点比较密集、相机畸变较大、棋盘格比较倾斜的情况起作用）
-			std::vector<float>::iterator maxposIt = std::max_element(angles.begin(), angles.end());
-			int maxpos = maxposIt - angles.begin();
-			//剔除
-			std::vector<float>::iterator it = angles.begin() + maxpos;
-			angles.erase(it);
+			bool isUsedReprojectError = true;
+			int maxpos = -1;
+			if (isUsedReprojectError)
+			{
+				std::vector<float>::iterator maxposIt = std::max_element(errors.begin(), errors.end());
+				maxpos = maxposIt - errors.begin();
+				//剔除(不用下面也可以 因为每次计算都会刷新)
+				std::vector<float>::iterator it = errors.begin() + maxpos;
+				errors.erase(it);
+			}
+			else
+			{
+				std::vector<float>::iterator maxposIt = std::max_element(angles.begin(), angles.end());
+				maxpos = maxposIt - angles.begin();
+				//剔除
+				std::vector<float>::iterator it = angles.begin() + maxpos;
+				angles.erase(it);
+			}
+			//筛选根据棋盘格角度（在棋盘格角点比较密集、相机畸变较大、棋盘格比较倾斜的情况起作用）
+			//筛选根绝重投影误差
+
 			std::vector<std::vector<cv::Point3f>>::iterator it2 = m_calibWorldPoint.begin() + maxpos;
 			m_calibWorldPoint.erase(it2);
 			std::vector<std::vector<cv::Point2f>>::iterator it3 = m_calibImagePoint.begin() + maxpos;
@@ -401,7 +417,8 @@ bool CameraIntrinsic::compute(bool isvisible)
 
 				if (posCount == maxpos) 
 				{
-					m_detectResults[resultPos] == false;
+					m_detectResults[resultPos] = false;
+					break;
 				}
 			}
 		}

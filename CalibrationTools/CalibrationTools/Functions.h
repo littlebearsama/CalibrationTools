@@ -6,6 +6,15 @@
 #include <fstream>
 #include <sstream>
 
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/console/parse.h>
+#include <pcl/features/eigen.h>
+#include <pcl/common/transforms.h>
+#include <pcl/common/common.h>
+
 struct Correspondence
 {
 	/** \brief Index of the query (source) point. */
@@ -52,3 +61,5 @@ void TransformPointCloud(std::vector<Eigen::Vector3f>& pointcloud, const Eigen::
 //通过法线计算旋转向量
 //之前的法线，之后的法线
 Eigen::Matrix4f CreateRotateMatrix(Eigen::Vector3f before, Eigen::Vector3f after);
+
+void getPlaneFlatness(pcl::PointCloud<pcl::PointXYZ>& cloudin, float outlierPercent, float& mazDistance, float&minDistance);

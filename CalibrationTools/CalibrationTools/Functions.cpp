@@ -1,4 +1,5 @@
 #include"Functions.h"
+#include <pcl/segmentation/sac_segmentation.h>
 
 void TransformPointCloud(std::vector<Eigen::Vector3f>& pointcloud, const Eigen::Matrix4f& transformation_matrix)
 {
@@ -184,4 +185,86 @@ Eigen::Matrix4f CreateRotateMatrix(Eigen::Vector3f before, Eigen::Vector3f after
 	rotationMatrix(2, 2) = cos(angle) + p_rotate[2] * p_rotate[2] * (1 - cos(angle));
 
 	return rotationMatrix;
+}
+
+void getPlaneFlatness(pcl::PointCloud<pcl::PointXYZ>& cloudin, float outlierPercent, float& maxDistance, float&minDistance)
+{
+	int size = cloudin.points.size();
+	//拟合平面
+	float A, B, C, D;
+	//拟合平面方式1
+	//pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+	//pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+	//pcl::SACSegmentation<pcl::PointXYZ> seg;
+	//seg.setOptimizeCoefficients(true);
+	//seg.setModelType(pcl::SACMODEL_PLANE);
+	//seg.setMethodType(pcl::SAC_RANSAC);
+	//seg.setDistanceThreshold(outlierMaxdistance);
+	////seg.setMaxIterations(100);
+
+	//pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPtr(new pcl::PointCloud<pcl::PointXYZ>);
+	//pcl::copyPointCloud(cloudin, *cloudPtr);
+	//seg.setInputCloud(cloudPtr);
+	//seg.segment(*inliers, *coefficients);
+
+	//if (inliers->indices.size() == 0)
+	//{
+	//	PCL_ERROR("Could not estimate a planar model for the given dataset.");
+	//	return;
+	//}
+	//A = coefficients->values[0];
+	//B = coefficients->values[1];
+	//C = coefficients->values[2];
+	//D = coefficients->values[3];
+
+	//拟合平面方式2
+	Eigen::Vector3f center;
+	Eigen::Vector3f normal;
+	planeFitting(cloudin, center, normal);
+	std::cout << "质心点为：" << center.x() << " " << center.y() << " " << center.z() << std::endl;
+
+	A = normal.x();
+	B = normal.y();
+	C = normal.z();
+	D = -(A*center.x() + B*center.y() + C*center.z());
+
+	std::cout << "当前平面方程为：" << A << "*x + " << B << "*y + " << C << "*z + " << D << " = 0" << std::endl;
+	std::vector<float> distances;
+	for (int i = 0; i < size; i++)
+	{
+		pcl::PointXYZ currentPt = cloudin.points[i];
+		if (isnan(currentPt.x)|| isnan(currentPt.y)|| isnan(currentPt.z))
+		{
+			continue;
+		}
+		float currentD = A*currentPt.x + B*currentPt.y + C*currentPt.z + D;
+		distances.push_back(currentD);
+	}
+	if (distances.size() < 3) 
+	{
+		return;
+	}
+
+	std::sort(distances.begin(), distances.end());
+	//移除outlierPercent的点
+	int numOfoutliers = distances.size()*outlierPercent;
+	int numOfHalfOutliers = numOfoutliers / 2;
+	std::vector<float> distanceRemovedOutliers;
+	distanceRemovedOutliers.resize(distances.size() - numOfHalfOutliers * 2);
+	std::memcpy(&distanceRemovedOutliers[0], &distances[0] + numOfHalfOutliers, sizeof(float)*(distances.size() - numOfHalfOutliers * 2));
+
+	maxDistance = *(distanceRemovedOutliers.end()-1);
+	minDistance = *distanceRemovedOutliers.begin();
+	std::cout << "下平面度为：" << minDistance << std::endl;
+	std::cout << "上平面度为：" << maxDistance << std::endl;
+	std::cout << "平面度为  ：" << maxDistance - minDistance << std::endl;
+
+	float averageD = 0;
+	for (int i = 0; i < distanceRemovedOutliers.size(); i++)
+	{
+		averageD += fabs(distanceRemovedOutliers[i]);
+	}
+	averageD /= distances.size();
+	std::cout << "平面点云距离平面模型的平均距离为：" << averageD << std::endl;
+
 }

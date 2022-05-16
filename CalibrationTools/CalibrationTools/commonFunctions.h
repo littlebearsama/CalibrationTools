@@ -16,6 +16,12 @@
 #include <pcl/common/transforms.h>
 #include <pcl/common/common.h>
 
+//拟合平面
+void planeFitting(Eigen::Matrix<float, Eigen::Dynamic, 3> const & points, Eigen::Vector3f & center, Eigen::Vector3f & norm);
+void planeFitting(const pcl::PointCloud<pcl::PointXYZ>& cloud, Eigen::Vector3f & center, Eigen::Vector3f & norm);
+//得到当前时间
+std::string currrentDataToString();
+
 //创建文件夹
 void createFolder(std::string path);
 //获取文件夹下面所有文件
@@ -38,6 +44,8 @@ void generateWorldPoints(const cv::Size& patternSize, const cv::Size2f& patternL
 //生成世界坐标系的点
 void generateWorldPoints_Multi(int imageCount, const cv::Size& patternSize, const cv::Size2f& patternLength, std::vector<std::vector<cv::Point3f>>& calibBoardPoint);
 
+//读取txt文件
+bool readTXTfile(std::string filename, pcl::PointCloud<pcl::PointXYZ>& cloud);
 //读取pcd文件
 void readPCDfile(std::string filename, pcl::PointCloud<pcl::PointXYZ>& cloud);
 

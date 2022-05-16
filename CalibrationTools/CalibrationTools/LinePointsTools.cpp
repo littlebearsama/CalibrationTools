@@ -1,6 +1,9 @@
 #include "LinePointsTools.h"
 #include <pcl/point_cloud.h>
 #include <pcl/filters/passthrough.h>
+#include <pcl/sample_consensus/ransac.h>
+#include <pcl/sample_consensus/sac_model_line.h>
+#include <pcl/segmentation/sac_segmentation.h>
 #include "commonFunctions.h"
 #include "ExtrinsicCalibration.h"
 
@@ -82,6 +85,50 @@ void LinePointsTools::getBack2GroundT(float minH, float maxH, float minD, float 
 	getBackToGroundTransformation(m_origincloud, minH, maxH, minD, maxD, maxOutliersDis, T);
 }
 
+void getWallPitch(const pcl::PointCloud<pcl::PointXYZ>& cloudin, Eigen::Matrix4f & T, float & pitch)
+{
+	T = Eigen::Matrix4f::Identity();
+	//currentSaveNUM++;
+	const int MINcountOfGroundpoints = 20;//一个墙面上最少有20个点。
+	//去除零点
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+	for (int i = 0; i < cloudin.size(); i++)
+	{
+		pcl::PointXYZ currentPoint = cloudin.points[i];
+		if (abs(currentPoint.x) < 0.01&&abs(currentPoint.y) < 0.01&&abs(currentPoint.z) < 0.01)
+			continue;
+		cloud_filtered->points.push_back(currentPoint);
+	}
+	
+	//拟合平面
+	float A, B, C, D;
+	pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients);
+	pcl::PointIndices::Ptr inliers(new pcl::PointIndices);
+	pcl::SACSegmentation<pcl::PointXYZ> seg;
+	seg.setOptimizeCoefficients(true);
+	seg.setModelType(pcl::SACMODEL_PLANE);
+	seg.setMethodType(pcl::SAC_RANSAC);
+	seg.setDistanceThreshold(1000);
+
+	seg.setInputCloud(cloud_filtered);
+	seg.segment(*inliers, *coefficients);
+
+	if (inliers->indices.size() == 0)
+	{
+		PCL_ERROR("Could not estimate a planar model for the given dataset.");
+		return;
+	}
+	A = coefficients->values[0];
+	B = coefficients->values[1];
+	C = coefficients->values[2];
+	D = coefficients->values[3];
+
+	Eigen::Vector3f before(0, 0, C);
+	Eigen::Vector3f after(0, 0, 1);
+	T = CreateRotateMatrix(before, after);
+	pitch = acos(C);
+}
+
 void getLineAngle(const pcl::PointCloud<pcl::PointXYZ>& cloudin, float distance, float delta, float maxZ, float minZ, float&angle)
 {
 	pcl::PassThrough<pcl::PointXYZ> passfilter;
@@ -125,10 +172,10 @@ void getLineAngle(const pcl::PointCloud<pcl::PointXYZ>& cloudin, float distance,
 		angle = 0;
 		return;
 	}
-	double k = lightline_para[0] / lightline_para[1];
+	//double k = lightline_para[0] / lightline_para[1];
 	//(y = k(x - x0) + y0)
 	//y = (p0/p1)*(x-p2)+p3
-	float currentangle = atan2f(lightline_para[0], lightline_para[1]);
+	float currentangle = atan2f(lightline_para[1], lightline_para[0]);
 	currentangle = 180 * currentangle / M_PI;
-	angle = currentangle ? (90 - currentangle) : -(90 + currentangle);
+	angle = (currentangle>0) ? (90 - currentangle) : -(90 + currentangle);
 }
