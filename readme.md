@@ -141,58 +141,6 @@ private:
 };
 
 
-1. 所有用于标定的图片名称路径
-2 .标定chart的大小以及物理间隔
-3. 所使用棋盘格的类型（圆点还是棋盘格）
-4. 相机类型(鱼眼还是普通相机)
-*/
-class CameraIntrinsic
-{
-public:
-	CameraIntrinsic(); //默认构造函数
-	CameraIntrinsic(std::string filename); //内参文件名称
-	~CameraIntrinsic();
-
-
-	bool readCameraIntrinsic(std::string filename);
-	bool saveCameraIntrinsic(std::string filename);
-	//设置计算参数
-	void setMaxReproectionError(float error) { m_MaxReporjectionError = error; }
-	void setParameters(std::vector<std::string> filenames, 
-		cv::Size imageSize, cv::Size patternSize, cv::Size2f patternLength, bool isCricle = false, 
-		bool isfisheye = false, bool complexCameraModel = false);
-	void printAllParameter();
-	bool compute(bool isvisible = true);//是否显示计算的角点
-	bool isCalibrated() { return m_isLoadCameraIntrinsic; }//是否已经加载了标定文件
-	//畸变矫正
-public:
-	cv::Size m_imageSize;//图像大小
-	std::vector<std::vector<cv::Point3f>> m_calibWorldPoint;//物理坐标点
-	std::vector<std::vector<cv::Point2f>> m_calibImagePoint;//棋盘格角点
-	cv::Mat m_cameraMatrix;//      内参
-	cv::Mat m_distCoeffs_fisheye;//鱼眼相机畸变
-	cv::Mat m_distCoeffs;//        相机畸变
-	std::vector<bool> m_detectResults;//角点检测是否成功
-
-private:
-	//复杂相机模型参数
-	bool m_complexCameraModel;
-	//标定过程参数
-	bool m_isLoadCameraIntrinsic;
-	std::vector<std::string> m_filenames;
-	cv::Size m_patternSize;//角点布局
-	cv::Size m_cornerROISize;//
-	cv::Size2f m_patternLength;//两个角点之间的物理距离(15, 15)
-	bool m_iscircle;//使用圆点标定板进行角点检测
-	bool m_isfisheye;//使用的是鱼眼参数模型
-	
-
-
-	//预先估算的最大重投影误差
-	float m_MaxReporjectionError;
-	float m_reprojectionError;//重投影误差
-
-};
 
 ```
 
